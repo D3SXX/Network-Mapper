@@ -1,4 +1,4 @@
-// Network-Mapper 0.1 alpha 2 by D3SXX
+// Network-Mapper 0.1 alpha 3 by D3SXX
 
 #include <gtk/gtk.h>
 #include <stdio.h>
@@ -77,17 +77,24 @@ void on_button_nmap_clicked(GtkWidget *widget, gpointer text_view) {
     GtkTextIter end;
     gtk_text_buffer_get_end_iter(buffer, &end);
 
+    if (entries[0].ethernetInterface[0] == '\0'){
+        gtk_text_buffer_insert(buffer, &end, "Please press 'Get ARP Entries'.\n", -1);
+        return;
+    }
+
     // Check if nmap command is available
     FILE *nmap_check = popen("which nmap", "r");
     if (nmap_check == NULL) {
-        gtk_text_buffer_insert(buffer, &end, "nmap was not found.\n", -1);
+        gtk_text_buffer_insert(buffer, &end, "nmap was not found, please install it.\n", -1);
         return;
     }
     pclose(nmap_check);
 
     // Get local network IP, subnet mask, and broadcast address
     char localIP[256], netmask[256], broadcast[256];
-    FILE *ifconfig_output = popen("ifconfig eth0", "r");
+    char command[256];
+    snprintf(command, sizeof(command), "ifconfig %s", entries[0].ethernetInterface);
+    FILE *ifconfig_output = popen(command, "r");
     if (ifconfig_output) {
         char line[512];
         while (fgets(line, sizeof(line), ifconfig_output)) {
@@ -101,6 +108,9 @@ void on_button_nmap_clicked(GtkWidget *widget, gpointer text_view) {
     // Construct the nmap command with calculated values
     char nmapCommand[512];
     snprintf(nmapCommand, sizeof(nmapCommand), "nmap -sP %s/%s", localIP, netmaskToCIDR(netmask)); // Use function to convert netmask to CIDR
+    char nmap_string[256];
+    snprintf(nmap_string, sizeof(nmap_string), "Executing nmap for ip address %s/%s.\n", localIP, netmaskToCIDR(netmask));
+    gtk_text_buffer_insert(buffer, &end, nmap_string, -1);
 
     // Execute the nmap command and capture the output
     FILE *nmap_output = popen(nmapCommand, "r");
@@ -120,7 +130,7 @@ void on_button_nmap_clicked(GtkWidget *widget, gpointer text_view) {
                 char localName[256], ipAddress[256];
                 if (sscanf(line, "Nmap scan report for %255[^ ] %255[^\n]", localName, ipAddress) == 2) {
                     gtk_text_buffer_insert(buffer, &end, localName, -1);
-                    gtk_text_buffer_insert(buffer, &end, " - ", -1);
+                    gtk_text_buffer_insert(buffer, &end, " ", -1);
                     gtk_text_buffer_insert(buffer, &end, ipAddress, -1);
                     gtk_text_buffer_insert(buffer, &end, "\n", -1);
                 }
