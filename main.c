@@ -1,4 +1,4 @@
-// Network-Mapper 0.1 alpha 3 by D3SXX
+// Network-Mapper 0.1 alpha 4 by D3SXX
 
 #include <gtk/gtk.h>
 #include <stdio.h>
@@ -9,6 +9,11 @@
 #define ENTRY_TEXT_MAX_SIZE 2048
 
 char *netmaskToCIDR(const char *netmask);
+
+gboolean is_moving_block = FALSE;
+int selected_block_index = -1;
+double selected_block_offset_x = 0.0;
+double selected_block_offset_y = 0.0;
 
 typedef struct {
     char localName[256];
@@ -166,6 +171,74 @@ char *netmaskToCIDR(const char *netmask) {
     return cidrStr;
 }
 
+gboolean on_drawing_area_draw(GtkWidget *widget, cairo_t *cr, gpointer user_data) {
+    // Clear the drawing area
+    cairo_set_source_rgb(cr, 1.0, 1.0, 1.0); // Set background color to white
+    cairo_paint(cr);
+
+    int width = gtk_widget_get_allocated_width(widget);
+    int height = gtk_widget_get_allocated_height(widget);
+
+    int rectangle_x = 85;
+    int rectangle_y = 40;
+
+    int x = 0;
+    int y = 0;
+
+    // Draw objects based on entries
+    for (int i = 0; i < numEntries; i++) {
+
+        if (x >= width-200) {
+            x = 100;
+            y += 100;
+
+        }
+        else{
+            x += 100;
+        }
+
+
+        // Debug
+        printf("Block %d size: %dx%d\n",i+1,rectangle_x,rectangle_y);
+        printf("width: %d height: %d X: %d Y: %d\n",width,height,x,y);
+
+        // Draw a block
+        cairo_set_source_rgb(cr, 0.0, 0.0, 0.0); // Set block color to black
+        cairo_rectangle(cr, x, y, rectangle_x, rectangle_y); // Adjust the size and position as needed
+        cairo_fill(cr);
+
+        // Draw text inside the block
+        cairo_set_source_rgb(cr, 1.0, 1.0, 1.0); // Set text color to white
+        cairo_move_to(cr, x , y + rectangle_y * 0.25); // Adjust the position for text
+        cairo_show_text(cr, entries[i].localName); // Draw localName
+        cairo_move_to(cr, x ,y + rectangle_y * 0.5 );
+        cairo_show_text(cr, entries[i].ipAddress); // Draw IP address
+        cairo_move_to(cr, x ,y + rectangle_y * 0.85 );
+        cairo_show_text(cr, entries[i].macAddress); // Draw Mac Address
+    }
+
+    return FALSE; // Let the default drawing handler do the rest
+}
+
+void on_button_open_map_clicked(GtkWidget *widget, gpointer user_data) {
+    GtkWidget *map_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_title(GTK_WINDOW(map_window), "Network Map");
+    gtk_container_set_border_width(GTK_CONTAINER(map_window), 10);
+    gtk_widget_set_size_request(map_window, 800, 600);
+
+    // Create a drawing area for the network map
+    GtkWidget *drawing_area = gtk_drawing_area_new();
+
+    // Connect the draw signal to the drawing function
+    g_signal_connect(G_OBJECT(drawing_area), "draw", G_CALLBACK(on_drawing_area_draw), NULL);
+
+    // Add the drawing area to the map window
+    gtk_container_add(GTK_CONTAINER(map_window), drawing_area);
+
+    // Show the network map window
+    gtk_widget_show_all(map_window);
+}
+
 
 int main(int argc, char *argv[]) {
     gtk_init(&argc, &argv);
@@ -177,6 +250,7 @@ int main(int argc, char *argv[]) {
 
     GtkWidget *button_arp = gtk_button_new_with_label("Get ARP Entries");
     GtkWidget *button_nmap = gtk_button_new_with_label("Scan Network");
+    GtkWidget *button_open_map = gtk_button_new_with_label("Open Network Map");
 
     GtkWidget *text_view = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(text_view), FALSE);
@@ -189,10 +263,12 @@ int main(int argc, char *argv[]) {
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     gtk_box_pack_start(GTK_BOX(vbox), button_arp, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), button_nmap, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), button_open_map, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), scrolled_window, TRUE, TRUE, 0);
 
     g_signal_connect(button_arp, "clicked", G_CALLBACK(on_button_arp_clicked), text_view);
     g_signal_connect(button_nmap, "clicked", G_CALLBACK(on_button_nmap_clicked), text_view);
+    g_signal_connect(button_open_map, "clicked", G_CALLBACK(on_button_open_map_clicked), NULL);
 
     gtk_container_add(GTK_CONTAINER(window), vbox);
 
